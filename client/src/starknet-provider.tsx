@@ -1,5 +1,5 @@
 import type { PropsWithChildren } from "react";
-import { mainnet } from "@starknet-react/chains";
+import { Chain } from "@starknet-react/chains";
 import {
   jsonRpcProvider,
   StarknetConfig,
@@ -7,9 +7,50 @@ import {
 } from "@starknet-react/core";
 import { ControllerConnector } from "@cartridge/connector";
 import { RPC_URL } from "./dojo/config";
+import manifest from "./dojo/manifest_dev.json";
+
+const KATANA_CHAIN_ID = "0x4b4154414e41"; // "KATANA" hex-encoded
+
+const katana: Chain = {
+  id: BigInt(KATANA_CHAIN_ID),
+  name: "Katana",
+  network: "katana",
+  testnet: true,
+  nativeCurrency: {
+    address:
+      "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d",
+    name: "Stark",
+    symbol: "STRK",
+    decimals: 18,
+  },
+  rpcUrls: {
+    default: { http: [RPC_URL] },
+    public: { http: [RPC_URL] },
+  },
+  paymasterRpcUrls: {
+    avnu: { http: [RPC_URL] },
+  },
+};
+
+const actionsAddress =
+  manifest.contracts.find((c) => c.tag === "starter-actions")?.address ?? "0x0";
 
 const connector = new ControllerConnector({
   chains: [{ rpcUrl: RPC_URL }],
+  defaultChainId: KATANA_CHAIN_ID,
+  policies: {
+    contracts: {
+      [actionsAddress]: {
+        methods: [
+          {
+            name: "Move",
+            entrypoint: "move",
+            description: "Move your position on the grid",
+          },
+        ],
+      },
+    },
+  },
 });
 
 const provider = jsonRpcProvider({
@@ -19,10 +60,11 @@ const provider = jsonRpcProvider({
 export default function StarknetProvider({ children }: PropsWithChildren) {
   return (
     <StarknetConfig
-      chains={[mainnet]}
+      chains={[katana]}
       provider={provider}
       connectors={[connector]}
       explorer={cartridge}
+      defaultChainId={katana.id}
       autoConnect
     >
       {children}

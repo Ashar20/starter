@@ -29,7 +29,7 @@ run_quiet() { log "$@"; "$@" >/dev/null 2>&1; }
 cd "$CONTRACTS_DIR"
 
 echo "=== Initializing contracts environment ==="
-run sozo build
+run_quiet sozo build
 
 # --- Start Katana ---
 run_bg katana --config katana.toml

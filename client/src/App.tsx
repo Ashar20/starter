@@ -10,8 +10,47 @@ import { useAccount, useConnect, useDisconnect } from "@starknet-react/core";
 import { ControllerConnector } from "@cartridge/connector";
 import { addAddressPadding, CairoCustomEnum } from "starknet";
 import { ModelsMapping } from "./dojo/models";
+import "./App.css";
 
 type Direction = "Left" | "Right" | "Up" | "Down";
+
+const GRID_SIZE = 7;
+const HALF = Math.floor(GRID_SIZE / 2);
+
+function TileGrid({ x, y }: { x: number; y: number }) {
+  const tiles = [];
+  for (let row = HALF; row >= -HALF; row--) {
+    for (let col = -HALF; col <= HALF; col++) {
+      const tx = x + col;
+      const ty = y + row;
+      const isPlayer = col === 0 && row === 0;
+      tiles.push(
+        <div key={`${col},${row}`} className={`tile${isPlayer ? " tile-player" : ""}`}>
+          {isPlayer && <span className="tile-player-marker">&#9670;</span>}
+          <span className="tile-coord">{tx},{ty}</span>
+        </div>
+      );
+    }
+  }
+  return (
+    <div className="grid-container">
+      <div className="grid-label">Position ({x}, {y})</div>
+      <div className="tile-grid">{tiles}</div>
+    </div>
+  );
+}
+
+function CompassRose({ onMove, disabled }: { onMove: (d: Direction) => void; disabled: boolean }) {
+  return (
+    <div className="compass">
+      <button className="compass-btn compass-north" onClick={() => onMove("Up")} disabled={disabled}>N</button>
+      <button className="compass-btn compass-west" onClick={() => onMove("Left")} disabled={disabled}>W</button>
+      <div className="compass-center">&#10022;</div>
+      <button className="compass-btn compass-east" onClick={() => onMove("Right")} disabled={disabled}>E</button>
+      <button className="compass-btn compass-south" onClick={() => onMove("Down")} disabled={disabled}>S</button>
+    </div>
+  );
+}
 
 function App() {
   const { client } = useDojoSDK();
@@ -58,44 +97,39 @@ function App() {
 
   if (!address) {
     return (
-      <div>
-        <h1>Dojo Starter</h1>
-        <button onClick={() => connect({ connector: controller })}>
-          Log in
-        </button>
+      <div className="login-screen">
+        <div className="login-card">
+          <h1 className="login-title">Dojo Starter</h1>
+          <p className="login-tagline">Chart your path on-chain</p>
+          <button className="btn-login" onClick={() => connect({ connector: controller })}>
+            Enter the World
+          </button>
+          <div className="login-ornament">&#9674; &#9674; &#9674;</div>
+        </div>
       </div>
     );
   }
 
+  const x = position?.x ?? 0;
+  const y = position?.y ?? 0;
+
   return (
-    <div>
-      <h1>Dojo Starter</h1>
-      <p>
-        {username ?? `${address.slice(0, 6)}...${address.slice(-4)}`}
-      </p>
-      <button onClick={() => disconnect()}>Log out</button>
-      <hr />
-      <p>
-        Position: ({position?.x ?? 0}, {position?.y ?? 0})
-      </p>
-      <div>
-        <button onClick={() => move("Up")} disabled={pending}>
-          Up
-        </button>
-        <br />
-        <button onClick={() => move("Left")} disabled={pending}>
-          Left
-        </button>
-        <button onClick={() => move("Right")} disabled={pending}>
-          Right
-        </button>
-        <br />
-        <button onClick={() => move("Down")} disabled={pending}>
-          Down
-        </button>
-      </div>
-      {pending && <p>Transaction pending...</p>}
-    </div>
+    <>
+      <header className="header">
+        <span className="header-title">Dojo Starter</span>
+        <div className="header-right">
+          <span className="header-username">
+            {username ?? `${address.slice(0, 6)}...${address.slice(-4)}`}
+          </span>
+          <button className="btn-logout" onClick={() => disconnect()}>Log out</button>
+        </div>
+      </header>
+      <main className="main-content">
+        <TileGrid x={x} y={y} />
+        <CompassRose onMove={move} disabled={pending} />
+        {pending && <span className="pending">Moving...</span>}
+      </main>
+    </>
   );
 }
 
