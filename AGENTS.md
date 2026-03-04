@@ -1,5 +1,10 @@
 # Agent Guide
 
+## Documentation
+
+- **Dojo**: https://book.dojoengine.org
+- **Controller**: https://docs.cartridge.gg
+
 ## Skills
 
 This repo uses skills from the [Agent Skills](https://agentskills.io/) ecosystem.

@@ -204,3 +204,5 @@ Design choices that support this:
 Future work:
 - `scripts/bump.sh` to automate version updates across all pin locations.
 - CI job that runs `check.sh` against nightly/pre-release toolchain builds.
+- E2e manifest compatibility check: spin up Katana, migrate, then verify the generated manifest is consumable by `createDojoConfig` (i.e. `world.abi` contains at least one `type: "interface"` entry).
+  This catches version mismatches between the contract toolchain and JS SDK, like the `@dojoengine/core` 1.8.x regression that replaced `world.abi` with `manifest.abis` (undefined in 1.7.x manifests).

@@ -1,9 +1,11 @@
 # Cairo / Dojo
 contracts/target/
+contracts/manifest_dev.json
 
 # Frontend
 client/node_modules/
 client/dist/
+.pnpm-store/
 *.tsbuildinfo
 
 # Environment
