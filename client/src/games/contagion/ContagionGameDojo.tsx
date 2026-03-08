@@ -17,6 +17,7 @@ import { Radar } from './components/Radar';
 import { PatientZeroNotification } from './components/PatientZeroNotification';
 import { warmupZKBackend } from '../../utils/zkProver';
 import { EGS_CONTRACT_ADDRESS } from '../../utils/egs';
+import { useDojoActions } from '../../hooks/useDojoActions';
 
 const IsometricMapCanvasLazy = lazy(() =>
   import('./components/IsometricMapCanvas').then((m) => ({ default: m.IsometricMapCanvas }))
@@ -57,16 +58,23 @@ export function ContagionGameDojo({ userAddress = '', roomCode }: ContagionGameD
   }, [effectiveAddress]);
 
   const socket = useGameSocket(effectiveAddress, localColor, roomCode);
+  const dojo = useDojoActions();
 
   const [localPlayerX, setLocalPlayerX] = useState(() => Math.floor((socket.mapSize || 200) / 2));
   const [localPlayerY, setLocalPlayerY] = useState(() => Math.floor((socket.mapSize || 200) / 2));
   const lastSyncedGridRef = useRef<{ x: number; y: number } | null>(null);
+  const dojoSpawnedRef = useRef(false);
 
   useEffect(() => {
     if (socket.gameStarted) {
       warmupZKBackend().catch(() => { /* non-critical */ });
+      // Spawn on-chain player when game starts
+      if (dojo.ready && !dojoSpawnedRef.current) {
+        dojoSpawnedRef.current = true;
+        dojo.spawn();
+      }
     }
-  }, [socket.gameStarted]);
+  }, [socket.gameStarted, dojo.ready, dojo.spawn]);
 
   // Reset EGS report flag when game is no longer over (e.g. after restart)
   useEffect(() => {
@@ -77,9 +85,9 @@ export function ContagionGameDojo({ userAddress = '', roomCode }: ContagionGameD
   useEffect(() => {
     if (!socket.gameOver || !account || reportResultSentRef.current) return;
     const score = Math.max(0, socket.myScore);
-    const tokens = playerTokens?.items ?? [];
+    const tokens = playerTokens?.data ?? [];
     const tokenForGame = tokens.find(
-      (t) => t.gameAddress === EGS_CONTRACT_ADDRESS
+      (t: { gameAddress?: string }) => t.gameAddress === EGS_CONTRACT_ADDRESS
     ) ?? tokens[0];
     const tokenId = tokenForGame?.tokenId;
     if (!tokenId) return;
@@ -91,7 +99,7 @@ export function ContagionGameDojo({ userAddress = '', roomCode }: ContagionGameD
         calldata: [BigInt(tokenId), BigInt(score)],
       })
       .catch((err) => console.warn("[EGS] report_result failed:", err));
-  }, [socket.gameOver, socket.myScore, account, playerTokens?.items]);
+  }, [socket.gameOver, socket.myScore, account, playerTokens?.data]);
 
   useEffect(() => {
     if (socket.roomClosed) {
@@ -346,6 +354,14 @@ export function ContagionGameDojo({ userAddress = '', roomCode }: ContagionGameD
               onPositionChange={(gridX, gridY) => {
                 socket.sendMove(gridX, gridY);
                 if (gridX !== localPlayerX || gridY !== localPlayerY) {
+                  // Mirror movement to Dojo on-chain contract (mapped to cardinal direction)
+                  const dx = gridX - localPlayerX;
+                  const dy = gridY - localPlayerY;
+                  if (Math.abs(dx) >= Math.abs(dy)) {
+                    dojo.move(dx > 0 ? 'Right' : 'Left');
+                  } else {
+                    dojo.move(dy > 0 ? 'Down' : 'Up');
+                  }
                   setLocalPlayerX(gridX);
                   setLocalPlayerY(gridY);
                 }
@@ -355,7 +371,11 @@ export function ContagionGameDojo({ userAddress = '', roomCode }: ContagionGameD
               deathTrigger={socket.deathTrigger}
               buriedGems={socket.buriedGems}
               dugGems={socket.dugGems}
-              onDigGem={(gemId, gridX, gridY) => socket.digGem(gemId, gridX, gridY)}
+              onDigGem={(gemId, gridX, gridY) => {
+                socket.digGem(gemId, gridX, gridY);
+                // Mirror dig action to Dojo on-chain contract
+                dojo.dig();
+              }}
               onCollectGem={(gemId, gridX, gridY) => socket.collectGem(gemId, gridX, gridY)}
               onTaskEvent={(ev) => {
                 if (ev.type === 'damage_taken' && ev.enemyType) {
@@ -513,6 +533,18 @@ export function ContagionGameDojo({ userAddress = '', roomCode }: ContagionGameD
         show={showPatientZero}
         onComplete={() => setShowPatientZero(false)}
       />
+
+      {dojo.playerState && (
+        <div className="absolute bottom-4 right-4 z-20 bg-black/80 border border-cyan-500/50 rounded-lg px-3 py-2 font-mono text-xs text-white backdrop-blur-sm">
+          <div className="text-cyan-400 font-bold mb-1">ON-CHAIN</div>
+          <div className="flex gap-3">
+            <span>Lvl {dojo.playerState.level}</span>
+            <span className="text-amber-400">Gold {dojo.playerState.gold}</span>
+            <span className="text-red-400">HP {dojo.playerState.health}</span>
+            <span className="text-purple-400">Best {dojo.playerState.best}</span>
+          </div>
+        </div>
+      )}
 
       <div className="mt-4 px-4 py-2 text-xs text-gray-600 space-y-1 bg-white/50 backdrop-blur-sm rounded">
         <p><strong>Controls:</strong></p>

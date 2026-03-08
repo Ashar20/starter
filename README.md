@@ -1,104 +1,130 @@
-# Dojo Starter
+# Contagion
 
-Official starter repo for [Dojo](https://book.dojoengine.org) — a provable game engine on Starknet.
+A social deduction .io game built on Starknet with the Dojo engine. One player is secretly Patient Zero. Infection spreads by proximity. Prove your health with ZK proofs.
 
-Clone this repo, run one command, and have a local game running in minutes.
-
-## Prerequisites
-
-- [asdf](https://asdf-vm.com/) or compatible version manager (reads `contracts/.tool-versions`)
-- [Dojo toolchain](https://book.dojoengine.org/getting-started/installation) — `scarb`, `sozo`, `katana`, `torii`
-- [Node.js](https://nodejs.org/) >= 18
-- [pnpm](https://pnpm.io/) >= 9
-- [jq](https://jqlang.github.io/jq/) (used by `dev.sh` to parse manifest JSON)
-
-Pinned dependency versions live in [`contracts/.tool-versions`](contracts/.tool-versions).
-
-## Quickstart
+## Quick Start
 
 ```bash
-# Clone the starter repo
-git clone https://github.com/dojoengine/starter.git
-cd starter
+# Install deps
+cd client && pnpm install
 
-# Start the full local stack (Katana + contracts + Torii + frontend)
-./scripts/dev.sh
+# Start backend + frontend
+./scripts/restart.sh
 ```
 
-Open https://localhost:5173 in your browser.
-Connect with Cartridge Controller, then use the compass to move and dig for treasure.
+Open **https://localhost:3000** (or http if no mkcert). Connect with Cartridge Controller, then play.
+
+## How to Play
+
+1. Connect with Cartridge Controller (Google or Discord signup)
+2. Create or join a room
+3. Move on the isometric map — one player is secretly Patient Zero
+4. Infection spreads when you get close to infected players
+5. Collect cure fragments to win, or survive until the timer ends
+6. Use test camps to prove your health with ZK proofs
+7. Accuse suspected Patient Zero and vote
 
 ## Architecture
 
 ```
-starter/
-├── contracts/          # Cairo/Dojo smart contracts
+contagion-dojo/
+├── contracts/          # Dojo 1.8 Cairo smart contracts
 │   └── src/
-│       ├── models.cairo          # Player model + Direction enum
-│       ├── systems/actions.cairo # spawn, move, dig logic
-│       └── tests/test_world.cairo
+│       ├── models.cairo              # Player model (position, health, gold, level, dug bitmap)
+│       ├── systems/actions.cairo     # spawn, move, dig — grid game with validation
+│       └── tests/test_world.cairo    # Contract tests
+├── egs/                # Embeddable Game Standard contract (Starknet 2.15.1)
+│   └── src/lib.cairo                 # IMinigameTokenData — provable score reporting
 ├── client/             # React + Vite + TypeScript frontend
 │   └── src/
-│       ├── App.tsx               # Game UI (grid, HUD, compass)
-│       ├── dojo/                 # SDK config, contracts, models
-│       ├── starknet.tsx          # Cartridge Controller + starknet-react
-│       └── tiles.ts             # Client-side tile content logic
-└── scripts/
-    ├── dev.sh          # One-command local dev environment
-    └── check.sh        # CI validation (build, test, lint, typecheck)
+│       ├── main.tsx                  # App entry point
+│       ├── starknet.tsx              # Cartridge Controller + starknet-react
+│       ├── dojo/                     # Dojo SDK config, contract wrappers, models
+│       └── games/contagion/          # Game components (isometric map, HUD, networking)
+├── server/             # Bun WebSocket server (real-time multiplayer)
+└── scripts/            # Setup, deploy, and utility scripts
 ```
 
-### Contracts
+### Smart Contracts (Cairo)
 
-Namespace: `starter`
+**Dojo contracts** (`contracts/`) — Dojo 1.8:
+- **Models**: `Player` — position, health, gold, level, dug bitmap
+- **Systems**: `spawn`, `move`, `dig` — grid-based game with on-chain validation
+- Two-layer randomness: Poseidon hash for tile content (~20% probability), block timestamp for dig outcome (gold vs bomb)
+- Level progression, health management, duplicate-dig prevention via bitmap
 
-**Player** model — stores position, health, gold, level, and a bitmap of dug tiles.
-Each player navigates a 10x10 grid, digging tiles that may contain gold or bombs.
-
-Three actions:
-- `spawn` — initialize a new player at a random-ish starting position
-- `move(direction)` — step in a cardinal direction (costs 1 health)
-- `dig` — reveal the current tile (gold, bomb, or empty)
-
-Tile content is determined by a two-layer randomness system:
-1. Poseidon hash over (player, level, x, y) determines if a tile has content (~20%)
-2. Block timestamp entropy at dig time determines gold vs bomb
+**EGS contract** (`egs/`) — Starknet 2.15.1 + [game-components](https://github.com/Provable-Games/game-components):
+- Implements `IMinigameTokenData` for provable score/game_over reporting
+- `report_result(token_id, score)` called when a game ends
+- Deployed on Sepolia
 
 ### Client
 
-React app using `starknet-react` and `@dojoengine/sdk`.
-Reads game state via Torii (gRPC subscriptions) and writes transactions through Cartridge Controller with session keys.
+- **React + Vite** with Three.js for isometric rendering
+- **Cartridge Controller** for player authentication (passkeys, Google, Discord)
+- **Dojo SDK** (`@dojoengine/core`, `@dojoengine/sdk`) for on-chain state
+- **Noir + bb.js** for ZK health proofs
+- **Denshokan SDK** for EGS integration (provable game sessions)
+- **WebSocket** for real-time multiplayer state
+
+### Backend
+
+- **Bun WebSocket server** (port 3001)
+- Room management, proximity-based infection logic, game state sync
+
+## Dojo Integration
+
+Contracts are deployed on Starknet Sepolia:
+- **World**: `0x056e42d1a8638411797a6dac30816d7f31949c6f5ba5c502e8e8b269afc8ac61`
+- **Actions**: `0x050aa714156b7fc942f0782d50d7323a0fb84fcffa8128a3d84f782c98df8e20`
+- **EGS**: `0x00afdc03274b847d6a006272632464b66fe6ac217879e3c3fdec53578e5145a0`
+
+Deploy contracts locally:
+```bash
+cd contracts && sozo build && sozo migrate
+```
+
+## EGS (Embeddable Game Standard)
+
+Contagion adopts the [Embeddable Game Standard](https://docs.provable.games/embeddable-game-standard) for provable, embeddable sessions.
+
+- **Frontend**: `DenshokanProvider` with React hooks (`useGames`, `useToken`, `useScoreUpdates`)
+- **Contract**: `egs/` implements `IMinigameTokenData`. Deploy with `./scripts/egs-deploy-sepolia.sh`, then register:
+  ```bash
+  cd client && EGS_DEPLOYER_PRIVATE_KEY=0x... pnpm run egs:register
+  ```
+- The client calls `report_result(token_id, score)` on-chain when a game ends
 
 ## Commands
 
 | Command | Description |
-|---|---|
-| `./scripts/dev.sh` | Start full local stack |
-| `./scripts/check.sh` | Run all CI checks |
-| `cd contracts && sozo build` | Build contracts |
+|---------|-------------|
+| `./scripts/restart.sh` | Kill 3000/3001, start backend + frontend |
+| `cd client && pnpm dev` | Frontend only (needs backend on 3001) |
+| `cd client && bun run dev:server` | Backend only |
+| `cd contracts && sozo build` | Build Dojo contracts |
 | `cd contracts && scarb test` | Run contract tests |
-| `cd client && pnpm dev` | Start frontend dev server (needs running backend) |
-| `cd client && pnpm lint` | Lint frontend |
-| `cd client && pnpm typecheck` | Typecheck frontend |
 
-## Troubleshooting
-
-**Port already in use**
-Katana (5050), Torii (8080), and Vite (5173) need their default ports free.
-Kill any existing processes on those ports before running `dev.sh`.
+## Share via ngrok
 
 ```bash
-lsof -ti:5050 -ti:8080 -ti:5173 | xargs kill -9
+# Terminal 1 — start the game
+./scripts/restart.sh
+
+# Terminal 2 — expose frontend
+cd client && pnpm exec ngrok http 3000
 ```
 
-**Torii fails to start**
-Torii depends on a successful contract migration.
-If Torii exits immediately, check that `sozo migrate` succeeded and that `manifest_dev.json` exists in `contracts/`.
+Share the `https://` URL — friends can play immediately.
 
-**Controller wallet not connecting**
-The frontend uses Cartridge Controller which requires HTTPS.
-Vite is configured with `mkcert` for local HTTPS — accept the self-signed certificate when prompted.
+For remote backend hosting, see the [ngrok backend guide](./scripts/ngrok-backend.sh).
 
-**Version mismatch errors**
-Ensure your installed tool versions match `contracts/.tool-versions`.
-Run `asdf install` from the `contracts/` directory to sync.
+## Prerequisites
+
+- [Dojo toolchain](https://book.dojoengine.org/getting-started/installation) (scarb, sozo, katana, torii)
+- [Node.js](https://nodejs.org/) >= 18, [pnpm](https://pnpm.io/) >= 9
+- [Bun](https://bun.sh/) (for WebSocket server)
+
+## Team
+
+@Ashar20

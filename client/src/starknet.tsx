@@ -43,6 +43,13 @@ const connector = new ControllerConnector({
       [EGS_CONTRACT_ADDRESS]: {
         methods: [{ name: "report_result", entrypoint: "report_result" }],
       },
+      [ACTIONS_ADDRESS]: {
+        methods: [
+          { name: "spawn", entrypoint: "spawn" },
+          { name: "move", entrypoint: "move" },
+          { name: "dig", entrypoint: "dig" },
+        ],
+      },
     },
   },
   signupOptions: ["google", "discord"],
