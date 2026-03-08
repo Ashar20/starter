@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWallet } from '../hooks/useWallet';
+import { EGSGamesSection } from '../components/EGSGamesSection';
 import './LandingPage.css';
 
 
@@ -225,6 +226,9 @@ export function LandingPage() {
           </tbody>
         </table>
       </section>
+
+      {/* EGS — Embeddable Game Standard */}
+      <EGSGamesSection />
 
       {/* CTA */}
       <section className="landing-cta-section" id="play">

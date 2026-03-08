@@ -1,0 +1,16 @@
+# EGS Contagion minigame — Embeddable Game Standard (Starknet 2.15.1)
+# Separate from Dojo contracts (2.13.1). Deploy and register with Denshokan Registry on Sepolia.
+
+[package]
+name = "contagion_egs"
+version = "0.1.0"
+edition = "2024_07"
+cairo-version = "2.8.0"
+
+[dependencies]
+starknet = "2.15.1"
+game_components_embeddable_game_standard = { git = "https://github.com/Provable-Games/game-components", tag = "v1.1.0" }
+game_components_interfaces = { git = "https://github.com/Provable-Games/game-components", tag = "v1.1.0" }
+openzeppelin_introspection = { git = "https://github.com/OpenZeppelin/cairo-contracts", tag = "v3.0.0" }
+
+[[target.starknet-contract]]

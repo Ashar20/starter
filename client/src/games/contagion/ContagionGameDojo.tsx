@@ -3,6 +3,8 @@
  * Map-only view: connect and play. No Stellar, no lobby, no on-chain proof submission.
  */
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
+import { useAccount } from '@starknet-react/core';
+import { usePlayerTokens } from '@provable-games/denshokan-sdk/react';
 import { useWallet } from '../../hooks/useWallet';
 import type { OtherPlayer } from './components/IsometricMapCanvas';
 import { FANTASY_TESTING_HOUSE_DOOR_X, FANTASY_TESTING_HOUSE_DOOR_Y } from './mapConstants';
@@ -13,6 +15,7 @@ import type { PlaceableItemData } from './components/PlaceableItem';
 import { Radar } from './components/Radar';
 import { PatientZeroNotification } from './components/PatientZeroNotification';
 import { warmupZKBackend } from '../../utils/zkProver';
+import { EGS_CONTRACT_ADDRESS } from '../../utils/egs';
 
 const IsometricMapCanvasLazy = lazy(() =>
   import('./components/IsometricMapCanvas').then((m) => ({ default: m.IsometricMapCanvas }))
@@ -27,7 +30,10 @@ interface ContagionGameDojoProps {
 
 export function ContagionGameDojo({ userAddress = '', roomCode }: ContagionGameDojoProps) {
   const { publicKey } = useWallet();
+  const { account } = useAccount();
   const effectiveAddress = (userAddress || (publicKey ?? '')) as string;
+  const { data: playerTokens } = usePlayerTokens(effectiveAddress || undefined, { limit: 10 });
+  const reportResultSentRef = useRef(false);
 
   const [showInventory, setShowInventory] = useState(false);
   const [showTestResultNotification, setShowTestResultNotification] = useState(false);
@@ -59,6 +65,31 @@ export function ContagionGameDojo({ userAddress = '', roomCode }: ContagionGameD
       warmupZKBackend().catch(() => { /* non-critical */ });
     }
   }, [socket.gameStarted]);
+
+  // Reset EGS report flag when game is no longer over (e.g. after restart)
+  useEffect(() => {
+    if (!socket.gameOver) reportResultSentRef.current = false;
+  }, [socket.gameOver]);
+
+  // EGS: when game ends, report score on-chain if user has an EGS token for this game
+  useEffect(() => {
+    if (!socket.gameOver || !account || reportResultSentRef.current) return;
+    const score = Math.max(0, socket.myScore);
+    const tokens = playerTokens?.items ?? [];
+    const tokenForGame = tokens.find(
+      (t) => t.gameAddress === EGS_CONTRACT_ADDRESS
+    ) ?? tokens[0];
+    const tokenId = tokenForGame?.tokenId;
+    if (!tokenId) return;
+    reportResultSentRef.current = true;
+    account
+      .execute({
+        contractAddress: EGS_CONTRACT_ADDRESS,
+        entrypoint: "report_result",
+        calldata: [BigInt(tokenId), BigInt(score)],
+      })
+      .catch((err) => console.warn("[EGS] report_result failed:", err));
+  }, [socket.gameOver, socket.myScore, account, playerTokens?.items]);
 
   useEffect(() => {
     if (socket.lastTestResult) {

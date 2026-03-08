@@ -13,6 +13,7 @@ const CHAIN_ID = "0x534e5f5345504f4c4941"; // SN_SEPOLIA
 
 const WORLD_ADDRESS = "0x056e42d1a8638411797a6dac30816d7f31949c6f5ba5c502e8e8b269afc8ac61";
 const ACTIONS_ADDRESS = "0x050aa714156b7fc942f0782d50d7323a0fb84fcffa8128a3d84f782c98df8e20";
+const EGS_CONTRACT_ADDRESS = "0x00afdc03274b847d6a006272632464b66fe6ac217879e3c3fdec53578e5145a0";
 
 const sepolia: Chain = {
   id: BigInt(CHAIN_ID),
@@ -37,7 +38,13 @@ const sepolia: Chain = {
 const connector = new ControllerConnector({
   chains: [{ rpcUrl: RPC_URL }],
   defaultChainId: CHAIN_ID,
-  policies: { contracts: {} },
+  policies: {
+    contracts: {
+      [EGS_CONTRACT_ADDRESS]: {
+        methods: [{ name: "report_result", entrypoint: "report_result" }],
+      },
+    },
+  },
   signupOptions: ["google", "discord"],
 });
 

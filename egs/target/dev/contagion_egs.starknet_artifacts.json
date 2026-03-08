@@ -1,0 +1,1 @@
+{"version":1,"contracts":[{"id":"s75i6jjp903kk","package_name":"contagion_egs","contract_name":"ContagionEgs","module_path":"contagion_egs::ContagionEgs","artifacts":{"sierra":"contagion_egs_ContagionEgs.contract_class.json","casm":null}}]}

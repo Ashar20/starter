@@ -12,20 +12,26 @@ cd client && pnpm install   # or: bun install
 ./scripts/restart.sh
 ```
 
-Open **http://localhost:3000**. Connect with Cartridge Controller, then play.
+Open **https://localhost:3000** (or http if no mkcert). Connect with Cartridge Controller, then play.
 
 ## Architecture
 
-- **Frontend**: React + Vite (port 3000)
+- **Frontend**: React + Vite (port 3000), [Embeddable Game Standard](https://docs.provable.games/embeddable-game-standard) via `@provable-games/denshokan-sdk`
 - **Backend**: Bun WebSocket server (port 3001)
 - **Wallet**: Starknet (Cartridge Controller) — address = player ID
-- **Game state**: WebSocket only (no on-chain game logic yet)
+- **Game state**: WebSocket (real-time); on-chain Dojo contracts in `contracts/`; EGS minigame in `egs/` for provable score/game_over
 
-## Dojo / EGS Integration (TODO)
+## EGS (Embeddable Game Standard)
 
-- [Embeddable Game Standard](https://docs.provable.games/embeddable-game-standard)
-- [denshokan-sdk](https://docs.provable.games/embeddable-game-standard/frontend) for score/leaderboard
-- Agent skills: `npx skills add dojogengine/book`, `npx skills add cartridge-gg/docs`
+Contagion adopts the [Embeddable Game Standard](https://docs.provable.games/embeddable-game-standard) for provable, embeddable sessions.
+
+- **Frontend**: `DenshokanProvider` (chain: Sepolia) and **EGS Games** section on the landing page (lists games from the registry). [denshokan-sdk](https://docs.provable.games/embeddable-game-standard/frontend) provides React hooks (`useGames`, `useToken`, `useScoreUpdates`) and WebSocket subscriptions.
+- **Contract**: `egs/` is a minimal EGS minigame (Starknet 2.15.1 + [game-components](https://github.com/Provable-Games/game-components)) that implements `IMinigameTokenData` (score, game_over). Deploy with `./scripts/egs-deploy-sepolia.sh`. Then **register** (so Contagion appears in the EGS Games section) by running from the **client** directory: `EGS_DEPLOYER_PRIVATE_KEY=0x... pnpm run egs:register`. Same key as used for deploy. The client calls `report_result(token_id, score)` when a game ends (if the player has an EGS token).
+
+## Dojo
+
+- **contracts/**: Dojo 1.8 (spawn, move, dig grid game) — deploy with `sozo migrate`.
+- Agent skills: `npx skills add dojoengine/book`, `npx skills add cartridge-gg/docs`
 
 ## Commands
 
