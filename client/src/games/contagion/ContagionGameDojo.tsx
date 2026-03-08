@@ -3,6 +3,7 @@
  * Map-only view: connect and play. No Stellar, no lobby, no on-chain proof submission.
  */
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAccount } from '@starknet-react/core';
 import { usePlayerTokens } from '@provable-games/denshokan-sdk/react';
 import { useWallet } from '../../hooks/useWallet';
@@ -29,6 +30,7 @@ interface ContagionGameDojoProps {
 }
 
 export function ContagionGameDojo({ userAddress = '', roomCode }: ContagionGameDojoProps) {
+  const navigate = useNavigate();
   const { publicKey } = useWallet();
   const { account } = useAccount();
   const effectiveAddress = (userAddress || (publicKey ?? '')) as string;
@@ -90,6 +92,12 @@ export function ContagionGameDojo({ userAddress = '', roomCode }: ContagionGameD
       })
       .catch((err) => console.warn("[EGS] report_result failed:", err));
   }, [socket.gameOver, socket.myScore, account, playerTokens?.items]);
+
+  useEffect(() => {
+    if (socket.roomClosed) {
+      navigate('/lobby', { replace: true, state: { roomClosed: socket.roomClosed } });
+    }
+  }, [socket.roomClosed, navigate]);
 
   useEffect(() => {
     if (socket.lastTestResult) {
@@ -264,8 +272,9 @@ export function ContagionGameDojo({ userAddress = '', roomCode }: ContagionGameD
 
         {showTestResultNotification && socket.lastTestResult && (
           <div
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 bg-black/90 px-6 py-4 rounded-lg border-4 pointer-events-none"
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/90 px-6 py-4 rounded-lg border-4 pointer-events-none"
             style={{
+              zIndex: 9999,
               borderColor: socket.lastTestResult.infected ? '#ff0000' : '#00ff00',
               animation: 'testResultFadeOut 4s ease-out forwards',
             }}
@@ -280,6 +289,20 @@ export function ContagionGameDojo({ userAddress = '', roomCode }: ContagionGameD
             <div className="font-mono text-xl font-bold" style={{ color: socket.lastTestResult.infected ? '#ff0000' : '#00ff00' }}>
               {socket.lastTestResult.infected ? '☣️ INFECTED' : '✓ HEALTHY'}
             </div>
+          </div>
+        )}
+
+        {socket.testErrorToast && (
+          <div
+            className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg border-2 pointer-events-none font-mono text-sm"
+            style={{
+              zIndex: 9999,
+              background: 'rgba(0,0,0,0.9)',
+              borderColor: '#f0a030',
+              color: '#fff',
+            }}
+          >
+            {socket.testErrorToast}
           </div>
         )}
 

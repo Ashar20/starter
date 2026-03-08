@@ -101,6 +101,10 @@ export interface UseGameSocketReturn {
   voteResults: VoteResult[];
   gameOver: GameOverInfo | null;
   gameStarted: boolean;
+  /** Set when server closed the room (e.g. creator left). Message to show; parent should redirect. */
+  roomClosed: string | null;
+  /** Transient message when test fails (e.g. too far from camp, cooldown). Cleared after a few seconds. */
+  testErrorToast: string | null;
 
   // Wave defense
   waveNumber: number;
@@ -204,6 +208,8 @@ export function useGameSocket(
   const [gameOver, setGameOver] = useState<GameOverInfo | null>(null);
   const [gameStarted, setGameStarted] = useState(false);
   const [mapSize, setMapSize] = useState(200);
+  const [roomClosed, setRoomClosed] = useState<string | null>(null);
+  const [testErrorToast, setTestErrorToast] = useState<string | null>(null);
 
   // Wave defense state
   const [waveNumber, setWaveNumber] = useState(0);
@@ -234,6 +240,13 @@ export function useGameSocket(
     }, 1000);
     return () => clearInterval(interval);
   }, [testCooldown]);
+
+  // Clear test error toast after 5s
+  useEffect(() => {
+    if (!testErrorToast) return;
+    const t = setTimeout(() => setTestErrorToast(null), 5000);
+    return () => clearTimeout(t);
+  }, [testErrorToast]);
 
   // Auto-dismiss flashed proofs after 8 seconds
   useEffect(() => {
@@ -625,8 +638,13 @@ export function useGameSocket(
             break;
           }
 
+          case 'room_closed':
+            setRoomClosed((msg.message as string) || 'Room closed.');
+            break;
+
           case 'test_error':
           case 'test_cooldown':
+            setTestErrorToast((msg.message as string) || `Cooldown: ${msg.remaining ?? '?'}s`);
             console.warn('[Test]', msg.message || `Cooldown: ${msg.remaining}s`);
             break;
 
@@ -793,6 +811,8 @@ export function useGameSocket(
     voteResults,
     gameOver,
     gameStarted,
+    roomClosed,
+    testErrorToast,
     waveNumber,
     waveCountdown,
     farmPatches,

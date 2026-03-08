@@ -183,6 +183,8 @@ function calculateMapSize(playerCount: number): number {
 interface GameRoom {
   code: string;
   createdAt: number;
+  /** Player ID of the room creator; when they leave, the room is closed. */
+  creatorId: string | null;
   players: Map<string, ServerPlayer>;
   cureFragments: CureFragment[];
   buriedGems: BuriedGem[];
@@ -218,6 +220,7 @@ function createRoom(code?: string): GameRoom {
   return {
     code: roomCode,
     createdAt: Date.now(),
+    creatorId: null,
     players: new Map(),
     cureFragments: [],
     buriedGems: [],
@@ -1347,6 +1350,7 @@ function handleMessage(ws: unknown, raw: string) {
         });
         wsToPlayer.set(ws, id);
         wsToRoom.set(ws, room.code);
+        if (!room.creatorId) room.creatorId = id;
         console.log(`[Join] ${name} → room ${room.code} (${players.size} players)`);
       }
 
@@ -1883,6 +1887,17 @@ Bun.serve({
         const room = rooms.get(roomCode);
         const name = room?.players.get(playerId)?.name ?? playerId;
         console.log(`[WS] ${name} disconnected from room ${roomCode}`);
+        if (room && room.creatorId === playerId) {
+          for (const [, p] of room.players) {
+            try {
+              send(p.ws, { type: 'room_closed', message: 'Room creator left.' });
+            } catch { /* already closed */ }
+            wsToPlayer.delete(p.ws);
+            wsToRoom.delete(p.ws);
+          }
+          rooms.delete(roomCode);
+          console.log(`[Room] Closed ${roomCode} (creator left)`);
+        }
       }
       wsToPlayer.delete(ws);
       wsToRoom.delete(ws);
